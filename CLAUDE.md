@@ -127,24 +127,40 @@ apex*. This is the inverse of what is physically needed — the sharpest
 O+ density gradients occur in the E-F transition region (90–200 km),
 close to the footpoints.
 
-### Consequence for low-apex tubes
+### Actual point counts (confirmed by `analyse_grid.py`)
 
-For near-equatorial tubes (lp ≈ 47–67, apex at 90–500 km), the sqrt
-formula produces very few points per hemisphere:
+Point counts per hemisphere and average step sizes for selected shells:
 
-| lp  | apex (km) | pts/hemi (approx) | avg spacing (km) |
-|-----|-----------|-------------------|-----------------|
-| 67  | ~90       | 1                 | —               |
-| 49  | ~143      | 5–6               | ~9              |
-| 47  | ~160      | 7–8               | ~9              |
-| 40  | ~300      | 15–18             | ~12             |
-| 20  | ~3500     | 90–100            | ~35             |
+| lp  | apex (km) | pts/hemi | avg dh (km) | note                         |
+|-----|-----------|----------|-------------|------------------------------|
+|   1 |   18784   |   292    |   64.2      | outermost; factor=0.2        |
+|  10 |    7304   |   230    |   31.5      | last lp with factor=0.2      |
+|  11 |    6541   |   158    |   41.1      | factor switches to 0.4 here  |
+|  20 |    2504   |   123    |   19.8      |                              |
+|  40 |     271   |    64    |    2.9      |                              |
+|  47 |     158   |    50    |    1.4      |                              |
+|  49 |     143   |    47    |    1.2      | GT-GIP problem zone          |
+|  55 |     117   |    40    |    0.7      |                              |
+|  67 |      94   |    24    |    0.15     | innermost; 3.5 km range      |
 
-The lp ≈ 47–50 band is exactly where the GT-GIP O+ solver fails at the
-dawn/dusk terminator (see `../gt-gip/CLAUDE.md`). With only 5–6 points
-spanning the 90–143 km E-F transition, adjacent grid cells differ by
-one or more orders of magnitude in O+ density, making the tridiagonal
-solver ill-conditioned.
+**Important correction**: The sqrt formula does NOT produce "very few
+points" for the low-apex tubes. lp=49 has 47 pts/hemi with ~1 km average
+spacing. The issue is the **spacing distribution**, not the count.
+
+**The formula concentrates points at both the footpoint and the apex** —
+step size starts at 0 (iht=1 adds zero), grows to a peak in the middle of
+the tube, then shrinks back to 0 near the apex (since `sqrt(HA-height)→0`).
+
+For high-apex tubes (lp=1, apex 18784 km), the step size in the 90–200 km
+E-F transition grows from 0 to ~1–2 km within a few steps and then
+continues growing — reaching ~60–80 km by 1000 km altitude. This gives
+coarse resolution throughout the plasmasphere.
+
+The GT-GIP O+ solver instabilities in the lp≈47–50 band at the
+dawn/dusk terminator (see `../gt-gip/CLAUDE.md`) are caused by large
+Peclet numbers and steep O+ gradients at the E-F boundary — not by
+insufficient grid points. The Scharfetter-Gummel implementation in
+GT-GIP addresses this, with 11 residual failures in the hardest cases.
 
 ## Key files
 
@@ -160,9 +176,16 @@ solver ill-conditioned.
 
 ## Compiler
 
-Currently hardcoded for `ifort` in `Makefile` and `runscript.sh`.
-Conversion to `gfortran` is needed to build in the WSL/Linux environment
-used for GT-GIP development.
+Both programs now build with `gfortran -std=legacy -ffixed-line-length-132 -w -O2`
+(converted from ifort on the `development` branch). Three Fortran 77
+string-literal continuation incompatibilities were fixed with labeled FORMAT
+statements (two in `apex2000.f`, one in `apxntrpb4lf.f`). Both stages run
+successfully and produce the correct output (npts2=13813).
+
+**Note on Apex_grid_data**: APXWRA opens the file with `STATUS='unknown'`
+(does not truncate). If an old multi-epoch file exists, re-running stage 1
+only overwrites the first epoch's records, leaving stale data that confuses
+APXRDA. Always delete `Apex_grid_data` before regenerating.
 
 ## Planned 2026 redesign
 
