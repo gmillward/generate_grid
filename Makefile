@@ -1,7 +1,7 @@
 
-FORTRAN=ifort
+FORTRAN=gfortran
 
-FFLAGS= -132
+FFLAGS= -std=legacy -ffixed-line-length-132 -w -O2
 
 A_OUT=apex_prog
 
@@ -15,7 +15,7 @@ OBJECTS=\
         calc_apex_params_2d_2.o
 
 $(A_OUT): $(OBJECTS)
-	$(FORTRAN) -o $(A_OUT) $(OBJECTS) $(LFLAGS) 
+	$(FORTRAN) -o $(A_OUT) $(OBJECTS) $(LFLAGS)
 
 .f.o:
 	$(FORTRAN) -c $(FFLAGS) $<

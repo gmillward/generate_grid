@@ -1067,9 +1067,10 @@ C          magnetic pole region.
       EDG = ' '
       IF (YLAT .EQ. WK(LLA+NLA-1)) EDG = 'north'
       IF (YLAT .EQ. WK(LLA))       EDG = 'south'
-      IF (EDG .NE. ' ') WRITE (MSGU,'(''        Coordinates are on the '
-     +',A,'' edge of the interpolation grid and'',/,''        latitude i
-     +s constrained to stay within grid limits when iterating.'')') EDG
+ 1071 FORMAT('        Coordinates are on the ',A,
+     +       ' edge of the interpolation grid and',/,
+     +       '        latitude is constrained to stay within grid limits when iterating.')
+      IF (EDG .NE. ' ') WRITE (MSGU,1071) EDG
 
       IST = -1
       GO TO 730
@@ -4044,8 +4045,9 @@ C          Trap out of range date:
       RETURN
  
 C          Error trap diagnostics:
- 9100 WRITE (0,'(''COFRM:  DATE'',F9.3,'' preceeds earliest available ('
-     +',F6.1,'')'')') DATE, EPOCH(1)
+ 9101 FORMAT('COFRM:  DATE',F9.3,
+     +       ' preceeds earliest available (',F6.1,')')
+ 9100 WRITE (0,9101) DATE, EPOCH(1)
       CALL EXIT (1)
  9200 FORMAT('COFRM:  DATE',F9.3,' is after the last recommended for ext
      +rapolation (',F6.1,')')

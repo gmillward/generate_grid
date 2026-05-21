@@ -929,9 +929,10 @@ C     DYLON = ATAN2 (CLP*SAD*SAL,CAD-SLM*SLP)*RTOD
       EDG = ' '
       IF (YLAT .EQ. WK(LLA+NLA-1)) EDG = 'north'
       IF (YLAT .EQ. WK(LLA))       EDG = 'south'
-      IF (EDG .NE. ' ') WRITE (MSGU,'(''        Coordinates are on the '
-     +',A,'' edge of the interpolation grid and'',/,''        latitude i
-     +s constrained to stay within grid limits when iterating.'')') EDG
+ 9321 FORMAT('        Coordinates are on the ',A,
+     +       ' edge of the interpolation grid and',/,
+     +       '        latitude is constrained to stay within grid limits when iterating.')
+      IF (EDG .NE. ' ') WRITE (MSGU,9321) EDG
 
       IST = -1
       GO TO 1010
