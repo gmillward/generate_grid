@@ -1,0 +1,180 @@
+# GIP Apex Coordinate Grid Generation
+
+## Overview
+
+This repository generates the GIP static coordinate file
+(`GIP_apex_coords_etc.YYYY.0.format`) used by the GT-GIP coupled
+ionosphere-thermosphere model. It defines every flux tube in the GIP
+computational grid — their geographic positions, magnetic field vectors,
+and coordinate transforms between geographic and apex-magnetic frames.
+
+## Two-program pipeline
+
+Controlled by `runscript.sh`:
+
+```
+apex2000_prog  <  input_date  >  outfile        # Stage 1
+apex_prog      <  input_date  >> outfile        # Stage 2
+```
+
+### Stage 1 — `apex2000_prog` (`apex2000.f`)
+
+Evaluates the IGRF magnetic field on a dense global geographic grid and
+writes the intermediate file `Apex_grid_data` (~31 MB). This is a
+pre-computed lookup table of apex coordinate quantities at every
+geographic location — the Richmond apex-coordinate library
+(`apxntrpb4lf.f`, `ggrid.f`, `magfld.f`) is used internally.
+
+**Known limitation:** the IGRF coefficients in `magfld.f` only extend to
+epoch ~2000 (NGRF=8 epochs, 1965–2005 per the comment in
+`generate_apex_coordinates.f`). Generating grids for post-2005 dates
+requires updating `magfld.f` with IGRF-13 coefficients (which cover up
+to 2025).
+
+### Stage 2 — `apex_prog` (`generate_apex_coordinates.f` + supporting files)
+
+Reads `Apex_grid_data` and `tiegcm_defined_apex_heights`, then builds
+the full 3D GIP grid tube by tube. Calls `calc_apex_params_2d_2.f90`
+to compute derived field quantities and write the final output file.
+
+Supporting routines: `apex.f`, `apxntrpb4lf.f`, `divve.f`, `ggrid.f`,
+`magfld.f`.
+
+## Grid structure
+
+### Latitudinal shells (`nlp = 67`)
+
+Defined by `tiegcm_defined_apex_heights` — a 97-row table of
+TIEGCM-compatible apex latitudes. Each row gives a magnetic colatitude
+and the corresponding apex height (km) and apex radius (km) for a field
+line rooted at 90 km altitude at that latitude.
+
+The code reads the first 48 rows (southern hemisphere) and selects all
+tubes with L-value between 1 and 4 (L = apex_radius / R_earth ≈
+1 + apex_height_km / 6371.2). It then doubles the count by inserting
+interpolated L-values between each pair, giving `nlp=67` latitudinal
+shells:
+
+- `lp=1` — outermost tube, L ≈ 3.5, apex at ~16,000 km
+- `lp=34` — mid-latitude, apex at a few hundred km
+- `lp=67` — innermost tube, L ≈ 1 (apex just above 90 km, equatorial
+  E-region)
+
+### Magnetic longitude (`nmp = 80`)
+
+80 evenly-spaced magnetic meridians, one every 4.5°.
+
+### Along-tube points (`npts = 583` per tube; `npts2 = 13813` packed)
+
+Points are placed symmetrically about the apex. The apex sits at the
+midpoint index `n_mid_point = (npts+1)/2 = 292`. Each tube uses indices
+`IN(mp,lp)` to `IS(mp,lp)`, centred on 292.
+
+`calc_apex_params_2d_2.f90` concatenates all tubes for a given `mp`
+into a single 1D packed array of length `npts2 = 13813`. These are the
+`IN` and `IS` index arrays that GIP reads directly.
+
+## Along-tube height spacing formula (current)
+
+Points are placed by iterating from the footpoint (90 km) toward the
+apex:
+
+```fortran
+height = height + (iht-1) * sqrt(HA_metres - height) * factor
+```
+
+where `factor = 0.2` for `lp < 11` (high-latitude tubes) and `0.4`
+elsewhere. The iteration stops when `height > HA` (the apex altitude).
+
+**Key property:** step size starts at zero (iht=1) and grows with each
+step, so the grid is *coarsest near the footpoints and densest near the
+apex*. This is the inverse of what is physically needed — the sharpest
+O+ density gradients occur in the E-F transition region (90–200 km),
+close to the footpoints.
+
+### Consequence for low-apex tubes
+
+For near-equatorial tubes (lp ≈ 47–67, apex at 90–500 km), the sqrt
+formula produces very few points per hemisphere:
+
+| lp  | apex (km) | pts/hemi (approx) | avg spacing (km) |
+|-----|-----------|-------------------|-----------------|
+| 67  | ~90       | 1                 | —               |
+| 49  | ~143      | 5–6               | ~9              |
+| 47  | ~160      | 7–8               | ~9              |
+| 40  | ~300      | 15–18             | ~12             |
+| 20  | ~3500     | 90–100            | ~35             |
+
+The lp ≈ 47–50 band is exactly where the GT-GIP O+ solver fails at the
+dawn/dusk terminator (see `../gt-gip/CLAUDE.md`). With only 5–6 points
+spanning the 90–143 km E-F transition, adjacent grid cells differ by
+one or more orders of magnitude in O+ density, making the tridiagonal
+solver ill-conditioned.
+
+## Key files
+
+| File | Role |
+|------|------|
+| `npts.h` | Grid dimensions: `npts=583`, `nmp=80`, `nlp=67` |
+| `tiegcm_defined_apex_heights` | 97-row table defining latitudinal shells by apex height/L-value |
+| `input_date` | Epoch for grid generation (currently `2000.0`) |
+| `generate_apex_coordinates.f` | Main Stage 2 program; contains height-spacing formula |
+| `calc_apex_params_2d_2.f90` | Computes derived field quantities; packs to `npts2=13813` |
+| `apex2000.f` | Stage 1; contains IGRF coefficients (currently limited to ~2005) |
+| `apex.f`, `apxntrpb4lf.f`, `divve.f`, `ggrid.f`, `magfld.f` | Richmond apex-coordinate library |
+
+## Compiler
+
+Currently hardcoded for `ifort` in `Makefile` and `runscript.sh`.
+Conversion to `gfortran` is needed to build in the WSL/Linux environment
+used for GT-GIP development.
+
+## Planned 2026 redesign
+
+The original grid was designed ~30 years ago under tight CPU and memory
+constraints. With 2026 hardware the grid can be substantially refined.
+Priority changes:
+
+### 1. Replace the along-tube height formula
+
+The sqrt formula must be replaced with one that concentrates points
+where the physics demands it — the E-F transition region (90–200 km).
+Candidates:
+
+- **Geometric progression from footpoint:** `dh(i) = dh_0 * r^i` with
+  `dh_0` set to ~1–2 km at 90 km, growing toward the apex. This gives
+  fine E-region resolution while remaining manageable near the apex.
+- **Piecewise:** fixed fine spacing (e.g. 2 km) up to ~300 km, then
+  coarser above. Simple and predictable.
+- **Density-weighted:** target a fixed number of grid points per
+  scale-height of O+. Requires an a-priori density profile but gives
+  physically optimal resolution.
+
+The formula is in `generate_apex_coordinates.f` at the `do iht = 1,1000`
+loop (~line 398), replicated for the northern and southern hemisphere
+traversals.
+
+### 2. Increase grid dimensions
+
+Finer spacing means more points per tube. `npts` in `npts.h` and
+`npts2` in `calc_apex_params_2d_2.f90` (currently 583 and 13813) will
+need to increase. The matching `NPTS` parameter in the GT-GIP model
+(`GIP_ionosphere_plasmasphere.f90`) must be updated in lockstep.
+
+### 3. Update IGRF to IGRF-13
+
+`magfld.f` contains IGRF coefficients through epoch ~2005. IGRF-13
+(released 2019) extends coverage to 2025 with 5-year model updates.
+Required to generate grids for present-day simulations.
+
+### 4. Extend latitudinal range (optional)
+
+The current outer boundary is L=4 (~16,000 km apex). Extending to L=8
+or beyond would improve plasmasphere coverage. This changes `nlp` and
+requires updating `tiegcm_defined_apex_heights` or replacing it with a
+programmatically generated L-value sequence.
+
+### 5. gfortran compatibility
+
+Both programs need to be converted from ifort to gfortran (updating
+`Makefile`, `runscript.sh`, and any ifort-specific syntax in the source).
