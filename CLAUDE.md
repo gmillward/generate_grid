@@ -81,15 +81,33 @@ shells:
 
 80 evenly-spaced magnetic meridians, one every 4.5°.
 
-### Along-tube points (`npts = 583` per tube; `npts2 = 13813` packed)
+### Along-tube points (`npts = 583` intermediate; `npts2 = 13813` in GIP)
 
-Points are placed symmetrically about the apex. The apex sits at the
-midpoint index `n_mid_point = (npts+1)/2 = 292`. Each tube uses indices
-`IN(mp,lp)` to `IS(mp,lp)`, centred on 292.
+**`npts = 583` is not the number of points along a single tube.** It is
+the size of the intermediate 3D generation array `(npts, nmp, nlp)` used
+during grid construction, with the apex of every tube centred at
+`n_mid_point = (npts+1)/2 = 292`. The actual number of points per tube
+varies by `lp` — from many hundreds for the outermost large tubes down
+to just 1–2 for the innermost near-equatorial tubes.
 
-`calc_apex_params_2d_2.f90` concatenates all tubes for a given `mp`
-into a single 1D packed array of length `npts2 = 13813`. These are the
-`IN` and `IS` index arrays that GIP reads directly.
+**GIP uses a packed 2D representation `(npts2, nmp)`.** For each
+magnetic longitude `mp`, all 67 tubes are laid out end-to-end in a
+single 1D array of total length `npts2 = 13813`:
+
+```
+mp column:  [ tube lp=1 (outermost) | tube lp=2 | ... | tube lp=67 (innermost) ]
+              IN(mp,1)   IS(mp,1)                        IS(mp,67) = 13813
+```
+
+`IN(mp,lp)` and `IS(mp,lp)` are the start and end indices of tube `lp`
+within this packed column. Since per-tube point counts depend only on
+apex height (i.e. `lp`), not on longitude, `IN` and `IS` are the same
+for all `mp`.
+
+This avoids the waste of a full 3D array `param(npts_max, nmp, nlp)`
+where most entries would be empty — large outer tubes have many more
+points than small inner ones, so a uniform per-tube dimension would waste
+enormous memory for the innermost tubes.
 
 ## Along-tube height spacing formula (current)
 
@@ -171,12 +189,18 @@ The formula is in `generate_apex_coordinates.f` at the `do iht = 1,1000`
 loop (~line 398), replicated for the northern and southern hemisphere
 traversals.
 
-### 2. Increase grid dimensions
+### 2. Increase `npts2` (the packed array size)
 
-Finer spacing means more points per tube. `npts` in `npts.h` and
-`npts2` in `calc_apex_params_2d_2.f90` (currently 583 and 13813) will
-need to increase. The matching `NPTS` parameter in the GT-GIP model
-(`GIP_ionosphere_plasmasphere.f90`) must be updated in lockstep.
+Finer along-tube spacing means more total points across all tubes for
+each longitude column. The packed array size `npts2 = 13813` in
+`calc_apex_params_2d_2.f90` must be increased to accommodate this, as
+must the matching `NPTS` parameter in GT-GIP's
+`GIP_ionosphere_plasmasphere.f90`. The intermediate generation array
+size `npts = 583` in `npts.h` may also need to increase if the largest
+tubes (lp=1, apex ~16,000 km) get more points.
+
+The new `npts2` can be estimated by summing the new per-tube point
+counts across all 67 lp shells once the new height formula is defined.
 
 ### 3. Update IGRF to IGRF-13
 
