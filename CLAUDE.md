@@ -42,12 +42,19 @@ Supporting routines: `apex.f`, `apxntrpb4lf.f`, `divve.f`, `ggrid.f`,
 
 ## Grid structure
 
-### Latitudinal shells (`nlp = 67`)
+### Latitudinal shells (`nlp = 67`) — **fixed by electrodynamics coupling**
 
-Defined by `tiegcm_defined_apex_heights` — a 97-row table of
-TIEGCM-compatible apex latitudes. Each row gives a magnetic colatitude
-and the corresponding apex height (km) and apex radius (km) for a field
-line rooted at 90 km altitude at that latitude.
+Defined by `tiegcm_defined_apex_heights` — a 97-row table originating
+from NCAR's TIEGCM model. Each row gives a magnetic colatitude and the
+corresponding apex height (km) and apex radius (km) for a field line
+rooted at 90 km altitude at that latitude.
+
+**These magnetic latitudes are not freely adjustable.** They map
+directly to the magnetic latitudes used by GIP's electrodynamics solver,
+which was designed to be compatible with TIEGCM's electrodynamics grid.
+Changing the latitudinal shells would break the electrodynamics coupling.
+`tiegcm_defined_apex_heights` should be treated as a fixed external
+constraint, not a redesign target.
 
 The code reads the first 48 rows (southern hemisphere) and selects all
 tubes with L-value between 1 and 4 (L = apex_radius / R_earth ≈
@@ -167,12 +174,15 @@ need to increase. The matching `NPTS` parameter in the GT-GIP model
 (released 2019) extends coverage to 2025 with 5-year model updates.
 Required to generate grids for present-day simulations.
 
-### 4. Extend latitudinal range (optional)
+### 4. Latitudinal range — treat with caution
 
-The current outer boundary is L=4 (~16,000 km apex). Extending to L=8
-or beyond would improve plasmasphere coverage. This changes `nlp` and
-requires updating `tiegcm_defined_apex_heights` or replacing it with a
-programmatically generated L-value sequence.
+The current outer boundary is L=4 (~16,000 km apex). The magnetic
+latitudes in `tiegcm_defined_apex_heights` are coupled to GIP's
+electrodynamics solver (inherited from NCAR's TIEGCM) and must not be
+changed without also updating that solver. Any extension of the
+latitudinal range (e.g. to L=8 for better plasmasphere coverage) would
+require coordinated changes across both the grid generation code and the
+GIP electrodynamics module.
 
 ### 5. gfortran compatibility
 
