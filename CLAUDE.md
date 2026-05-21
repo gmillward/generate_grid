@@ -49,12 +49,22 @@ from NCAR's TIEGCM model. Each row gives a magnetic colatitude and the
 corresponding apex height (km) and apex radius (km) for a field line
 rooted at 90 km altitude at that latitude.
 
-**These magnetic latitudes are not freely adjustable.** They map
-directly to the magnetic latitudes used by GIP's electrodynamics solver,
-which was designed to be compatible with TIEGCM's electrodynamics grid.
-Changing the latitudinal shells would break the electrodynamics coupling.
+**These magnetic latitudes are not freely adjustable.** The
+electrodynamics solver works on the 2D (mp, lp) magnetic
+longitude/latitude grid: it integrates physical parameters (conductivity,
+currents etc.) along each field line to produce 2D field-line-integrated
+quantities, then solves the electrodynamics on that 2D grid. It is the
+2D (mp, lp) grid that couples to TIEGCM — not the individual along-tube
+points. Changing the latitudinal shells would break that coupling.
 `tiegcm_defined_apex_heights` should be treated as a fixed external
 constraint, not a redesign target.
+
+**The along-tube points are freely redesignable.** They are used only
+by GIP's plasma diffusion solver (the tridiagonal O+/H+ solvers) and the
+field-line integration that feeds the 2D electrodynamics grid. More
+points, or differently spaced points, along a tube do not affect the 2D
+grid structure — only the accuracy and stability of the along-tube
+computation.
 
 The code reads the first 48 rows (southern hemisphere) and selects all
 tubes with L-value between 1 and 4 (L = apex_radius / R_earth ≈
