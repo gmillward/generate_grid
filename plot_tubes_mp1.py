@@ -91,7 +91,7 @@ for lp_idx, L in enumerate(L_all, start=1):
 # ---------------------------------------------------------------------------
 fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(22, 8))
 fig.subplots_adjust(left=0.05, right=0.88, wspace=0.28)
-fig.suptitle('GIP flux-tube grid, mp=1  (dipole approximation)', fontsize=14, y=1.01)
+fig.suptitle('GIP flux-tube grid, mp=1  (dipole approximation)', fontsize=14, y=0.98)
 
 panels = [
     (ax1, None,  20000, 'Full range (90 – apex)'),
