@@ -8,6 +8,29 @@ ionosphere-thermosphere model. It defines every flux tube in the GIP
 computational grid — their geographic positions, magnetic field vectors,
 and coordinate transforms between geographic and apex-magnetic frames.
 
+### What "apex coordinates" means
+
+A simple dipole magnetic field has the analytic field-line equation
+`r = L · R_earth · cos²(λ)`, where λ is magnetic latitude and L is the
+field-line label. Richmond's apex coordinate system moves beyond this to
+use the **real IGRF magnetic field**: instead of an analytic formula, each
+field line is traced numerically to its highest point — the *apex* — and
+that apex location becomes the coordinate reference. This is the key
+contribution of the Richmond (1995) library (`apxntrpb4lf.f`, `apex.f`,
+`ggrid.f`, `magfld.f`): it precomputes the IGRF-based apex transforms on a
+global geographic grid (`Apex_grid_data`) so that subsequent coordinate
+conversions can be done by fast interpolation rather than tracing field
+lines from scratch each time.
+
+**Implication for the visualisation scripts:** `plot_tubes_mp1.py` uses the
+dipole formula to draw the arch shape of each tube (latitude vs height).
+The L-values themselves come from the real IGRF-computed
+`tiegcm_defined_apex_heights`, so the tube *boundaries* are accurate — but
+the *shape of each arch as drawn* is a dipole approximation. A fully
+accurate geographic-latitude plot would require calling APXQ2G for every
+grid point (i.e. reading the actual lat/lon arrays from the GIP output
+file).
+
 ## Two-program pipeline
 
 Controlled by `runscript.sh`:
