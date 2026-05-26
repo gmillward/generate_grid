@@ -100,7 +100,7 @@ panels = [
 ]
 
 for ax, _, ymax, title in panels:
-    ax.set_xlabel('Geographic latitude (°)', fontsize=11)
+    ax.set_xlabel('Magnetic latitude (°)  [dipole approx.]', fontsize=11)
     ax.set_ylabel('Altitude (km)', fontsize=11)
     ax.set_title(title, fontsize=11)
     ax.set_xlim([-65, 65])
